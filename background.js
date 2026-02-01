@@ -45,3 +45,16 @@ browser.contextMenus.onClicked.addListener(async (info) => {
     alert("Error: All API keys failed or limit reached.");
   }
 });
+
+// Проверка за нова версия при стартиране
+async function checkForUpdates() {
+  try {
+    const response = await fetch("https://raw.githubusercontent.com/nikolay-holodenko/FB-Holopost/main/version.json");
+    const data = await response.json();
+    if (data.version !== "1.0.0") {
+      // Запазваме информация, че има ъпдейт
+      browser.storage.local.set({ updateAvailable: data.update_link });
+    }
+  } catch (e) { console.log("Update check failed (offline or blocked)"); }
+}
+checkForUpdates();
