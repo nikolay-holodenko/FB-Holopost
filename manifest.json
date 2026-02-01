@@ -29,8 +29,8 @@
     "gecko": {
       "id": "holopost@nikolay-holodenko",
       "data_collection_permissions": {
+        "required": false,
         "opt_out": true,
-        "opt_in": false,
         "description": "FB Holopost does not collect or store any personal data. All processing is done locally or through the user's private API key."
       }
     }
