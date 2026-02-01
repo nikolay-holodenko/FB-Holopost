@@ -8,12 +8,12 @@
     "128": "icon.png"
   },
   "permissions": [
-  "contextMenus",
-  "storage",
-  "activeTab",
-  "https://generativelanguage.googleapis.com/*",
-  "https://raw.githubusercontent.com/*"
-],
+    "contextMenus",
+    "storage",
+    "activeTab",
+    "https://generativelanguage.googleapis.com/*",
+    "https://raw.githubusercontent.com/nikolay-holodenko/FB-Holopost/main/*"
+  ],
   "background": {
     "scripts": ["background.js"]
   },

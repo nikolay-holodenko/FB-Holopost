@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { width: 300px; padding: 15px; font-family: sans-serif; background: #f4f7f9; }
+        .header { display: flex; align-items: center; margin-bottom: 15px; }
+        .header img { width: 30px; margin-right: 10px; }
+        h3 { margin: 0; color: #1a73e8; }
+        #update-notice { 
+            display: none; background: #ff9800; color: white; 
+            padding: 8px; margin-bottom: 10px; border-radius: 4px; 
+            font-size: 12px; text-align: center; cursor: pointer;
+        }
+        #result { 
+            background: white; border: 1px solid #ddd; 
+            padding: 10px; border-radius: 5px; min-height: 50px; 
+            font-size: 14px; white-space: pre-wrap;
+        }
+        .footer { margin-top: 15px; font-size: 11px; color: #666; display: flex; justify-content: space-between; }
+        a { color: #1a73e8; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div id="update-notice">New version available! / Налична е нова версия!</div>
+    
+    <div class="header">
+        <img src="icon.png" alt="logo">
+        <h3>FB Holopost</h3>
+    </div>
+
+    <div id="result">Очаква се анализ... / Waiting for analysis...</div>
+
+    <div class="footer">
+        <span>v1.0.0</span>
+        <a href="#" id="open-options">Settings / Настройки</a>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
