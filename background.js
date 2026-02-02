@@ -1,4 +1,6 @@
 let lastPendingRequest = null;
+const CURRENT_VERSION = "1.1";
+const GITHUB_JSON_URL = "https://github.com/nikolay-holodenko/FB-Holopost/version.json";
 const MODELS = ["gemini-2.5-flash", "gemini-1.5-flash"];
 
 const prompts = {
@@ -23,45 +25,52 @@ chrome.storage.onChanged.addListener((changes) => { if (changes.lang) updateMenu
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "analyze-content") {
-    chrome.storage.local.get(['key1', 'key2', 'key3', 'lang'], function(data) {
-      const keys = [data.key1, data.key2, data.key3].filter(k => k && k.trim() !== "");
-      const lang = data.lang || 'bg';
+    // 1. ПЪРВО ПРОВЕРЯВАМЕ ЗА ЪПДЕЙТ
+    fetch(GITHUB_JSON_URL)
+      .then(res => res.json())
+      .then(updateData => {
+        if (updateData.version !== CURRENT_VERSION && updateData.critical) {
+          // КРИТИЧЕН ЪПДЕЙТ - БЛОКИРАМЕ РАБОТАТА
+          chrome.tabs.sendMessage(tab.id, { 
+            action: "show_update_block", 
+            updateUrl: updateData.update_url,
+            lang: "bg" // Може да се вземе от сторидж, ако е важно
+          });
+          return;
+        }
 
-      if (keys.length > 0) {
-        chrome.tabs.sendMessage(tab.id, { action: "show_loading", lang: lang });
-        callAI(prompts[lang] + info.selectionText, keys, tab.id, 0, 0, lang);
-      } else {
-        chrome.tabs.sendMessage(tab.id, { 
-            action: "show_result", 
-            text: (lang === 'en' ? "⚠️ No API keys found!" : "⚠️ Не са намерени API ключове!"), 
-            color: "red", lang: lang 
-        });
-      }
-    });
+        // 2. АКО НЯМА КРИТИЧЕН ЪПДЕЙТ, ПРОДЪЛЖАВАМЕ КЪМ АНАЛИЗА
+        runMainLogic(info, tab);
+      })
+      .catch(() => runMainLogic(info, tab)); // При грешка в GitHub, все пак пускаме анализа
   }
 });
 
+function runMainLogic(info, tab) {
+  chrome.storage.local.get(['key1', 'key2', 'key3', 'lang'], function(data) {
+    const keys = [data.key1, data.key2, data.key3].filter(k => k && k.trim() !== "");
+    const lang = data.lang || 'bg';
+    if (keys.length > 0) {
+      chrome.tabs.sendMessage(tab.id, { action: "show_loading", lang: lang });
+      callAI(prompts[lang] + info.selectionText, keys, tab.id, 0, 0, lang);
+    } else {
+      chrome.tabs.sendMessage(tab.id, { action: "show_result", text: (lang === 'en' ? "⚠️ Missing API Key!" : "⚠️ Липсва API ключ!"), color: "orange", missingKey: true, lang: lang });
+    }
+  });
+}
+
 async function callAI(prompt, keys, tabId, keyIndex, modelIndex, lang) {
-  // АКО СМЕ ИЗЧЕРПАЛИ ВСИЧКИ КЛЮЧОВЕ
   if (keyIndex >= keys.length) {
-    chrome.tabs.sendMessage(tabId, { 
-        action: "show_result", 
-        text: (lang === 'en' ? "❌ No active keys available!" : "❌ Няма активни ключове в момента!"), 
-        color: "red", lang: lang 
-    });
+    chrome.tabs.sendMessage(tabId, { action: "show_result", text: (lang === 'en' ? "❌ No active keys!" : "❌ Няма активни ключове!"), color: "red", lang: lang });
     return;
   }
 
   const storageKey = `lock_key${keyIndex + 1}`;
   const lockData = await chrome.storage.local.get([storageKey]);
-  
-  // Проверка дали текущият ключ е блокиран
   if (lockData[storageKey] && lockData[storageKey] > Date.now()) {
-    console.log(`Ключ ${keyIndex + 1} е блокиран. Пробвам следващия...`);
     return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
   }
 
-  // Маркираме активния ключ
   chrome.storage.local.set({ active_key_index: keyIndex + 1 });
 
   const currentModel = MODELS[modelIndex] || MODELS[0];
@@ -73,17 +82,13 @@ async function callAI(prompt, keys, tabId, keyIndex, modelIndex, lang) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
-
     const resData = await response.json();
 
     if (response.status === 429) {
       let seconds = 60;
       const waitMatch = (resData.error?.message || "").match(/retry in ([\d\.]+)s/);
       if (waitMatch) seconds = parseFloat(waitMatch[1]);
-
       await chrome.storage.local.set({ [storageKey]: Date.now() + (seconds * 1000) });
-
-      // Продължаваме към следващия ключ
       return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
     }
 
@@ -94,10 +99,15 @@ async function callAI(prompt, keys, tabId, keyIndex, modelIndex, lang) {
       let color = p >= 85 ? "#d93025" : (p >= 45 ? "#f9ab00" : "#28a745");
       chrome.tabs.sendMessage(tabId, { action: "show_result", text: resultText, color: color, lang: lang });
     } else {
-      // При друга грешка също пробваме следващия ключ
-      return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
+      callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
     }
-  } catch (e) {
-    return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
-  }
+  } catch (e) { callAI(prompt, keys, tabId, keyIndex + 1, 0, lang); }
 }
+
+chrome.runtime.onMessage.addListener((request) => {
+  if (request.action === "retry_last_scan" && lastPendingRequest) {
+    const { prompt, keys, tabId, lang } = lastPendingRequest;
+    callAI(prompt, keys, tabId, 0, 0, lang);
+    lastPendingRequest = null;
+  }
+});

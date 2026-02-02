@@ -1,21 +1,39 @@
+const CURRENT_VERSION = "1.1";
+const GITHUB_VER_URL = "https://raw.githubusercontent.com/nikolay-holodenko/FB-Holopost/main/version.json";
+
 const uiTranslations = {
-  bg: { title: "⚙️ FB Holopost Настройки", key1: "API Ключ 1:", key2: "API Ключ 2:", key3: "API Ключ 3:", langLabel: "Език на отговора:", saveBtn: "💾 Запази", statusActive: "Статус: ● Активен", statusInactive: "Статус: ○ Неактивен", done: "✅ Готово!", wait: "Изчакайте: " },
-  en: { title: "⚙️ FB Holopost Settings", key1: "API Key 1:", key2: "API Key 2:", key3: "API Key 3:", langLabel: "Response Language:", saveBtn: "💾 Save", statusActive: "Status: ● Active", statusInactive: "Status: ○ Inactive", done: "✅ Done!", wait: "Wait: " }
+  bg: { title: "⚙️ FB Holopost Настройки", key1: "API Ключ 1:", key2: "API Ключ 2:", key3: "API Ключ 3:", langLabel: "Език на отговора:", saveBtn: "💾 Запази", statusActive: "Статус: ● Активен", statusInactive: "Статус: ○ Неактивен", done: "✅ Готово!", wait: "Изчакайте: ", update: "🚀 Има нова версия" },
+  en: { title: "⚙️ FB Holopost Settings", key1: "API Key 1:", key2: "API Key 2:", key3: "API Key 3:", langLabel: "Response Language:", saveBtn: "💾 Save", statusActive: "Status: ● Active", statusInactive: "Status: ○ Inactive", done: "✅ Done!", wait: "Wait: ", update: "🚀 New version" }
 };
 
 function applyTranslations(lang) {
   const t = uiTranslations[lang] || uiTranslations.bg;
   document.getElementById('ui-title').textContent = t.title;
-  // Ползваме innerHTML само веднъж при зареждане/смяна за структурата
-  document.getElementById('ui-key1').innerHTML = `${t.key1} <span id="active-1" class="active-check"></span>`;
-  document.getElementById('ui-key2').innerHTML = `${t.key2} <span id="active-2" class="active-check"></span>`;
-  document.getElementById('ui-key3').innerHTML = `${t.key3} <span id="active-3" class="active-check"></span>`;
+  document.getElementById('ui-key1').childNodes[0].textContent = t.key1;
+  document.getElementById('ui-key2').childNodes[0].textContent = t.key2;
+  document.getElementById('ui-key3').childNodes[0].textContent = t.key3;
   document.getElementById('ui-lang-label').textContent = t.langLabel;
   document.getElementById('save').textContent = t.saveBtn;
+  document.getElementById('update-btn').textContent = t.update;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   const statusEl = document.getElementById('status-text');
+  document.getElementById('current-version').textContent = CURRENT_VERSION;
+
+  // 1. ПРОВЕРКА ЗА НОВА ВЕРСИЯ (НЕКРИТИЧНА)
+  fetch(GITHUB_VER_URL)
+    .then(res => res.json())
+    .then(data => {
+      if (data.version !== CURRENT_VERSION) {
+        const upBtn = document.getElementById('update-btn');
+        upBtn.style.display = "block";
+        upBtn.onclick = () => window.open(data.update_url, '_blank');
+      }
+    })
+    .catch(e => console.log("Update check skipped"));
+
+  // 2. ЗАРЕЖДАНЕ НА ДАННИ
   chrome.storage.local.get(['key1', 'key2', 'key3', 'lang'], (data) => {
     const lang = data.lang || 'bg';
     applyTranslations(lang);
@@ -26,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStatus(data.key1, statusEl, lang);
   });
 
+  // 3. ЗАПАЗВАНЕ
   document.getElementById('save').addEventListener('click', () => {
     const lang = document.getElementById('lang').value;
     const settings = {
@@ -61,13 +80,10 @@ async function checkKeyStatus() {
 
     const isLocked = lockTime && lockTime > now;
 
-    // ВИЗУАЛИЗАЦИЯ НА ✔
     if (activeSpan) {
-      // Показваме чека само ако това е последният ползван ключ И той не е в момента блокиран
       activeSpan.textContent = (activeIdx === i && !isLocked) ? "✔" : "";
     }
 
-    // ВИЗУАЛИЗАЦИЯ НА БЛОКИРОВКАТА
     if (isLocked) {
       const remaining = Math.ceil((lockTime - now) / 1000);
       input.style.borderColor = "#d93025";

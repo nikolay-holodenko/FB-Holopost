@@ -8,6 +8,7 @@
     label { display: block; margin-top: 10px; font-size: 12px; font-weight: bold; }
     input { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
     .key-timer { font-size: 11px; color: #d93025; font-weight: bold; height: 14px; display: block; margin-top: 2px; }
+    .active-check { color: #42b72a; font-weight: bold; margin-left: 5px; }
     select { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; background: white; }
     .footer { margin-top: 15px; display: flex; align-items: center; justify-content: space-between; }
     button { background: #42b72a; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -15,21 +16,25 @@
     #status-text { font-size: 12px; font-weight: bold; color: #65676b; }
     .active { color: #42b72a !important; }
     .inactive { color: #d93025 !important; }
-.active-check { color: #42b72a; font-weight: bold; margin-left: 5px; }
+    
+    /* Стилизация на версията */
+    .version-footer { margin-top: 15px; font-size: 11px; color: #888; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 8px; }
+    #update-btn { background: #1877f2; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; display: none; }
+    #update-btn:hover { background: #166fe5; }
   </style>
 </head>
 <body>
   <h3 id="ui-title">Настройки</h3>
   
-  <label id="ui-key1">API Ключ 1:</label>
+  <label id="ui-key1">API Ключ 1: <span id="active-1" class="active-check"></span></label>
   <input type="text" id="key1">
   <span id="timer-key1" class="key-timer"></span>
   
-  <label id="ui-key2">API Ключ 2:</label>
+  <label id="ui-key2">API Ключ 2: <span id="active-2" class="active-check"></span></label>
   <input type="text" id="key2">
   <span id="timer-key2" class="key-timer"></span>
   
-  <label id="ui-key3">API Ключ 3:</label>
+  <label id="ui-key3">API Ключ 3: <span id="active-3" class="active-check"></span></label>
   <input type="text" id="key3">
   <span id="timer-key3" class="key-timer"></span>
 
@@ -43,6 +48,12 @@
     <span id="status-text">...</span>
     <button id="save">Запази</button>
   </div>
+
+  <div class="version-footer">
+    <span>v<span id="current-version">1.1</span></span>
+    <button id="update-btn">🚀 Има нова версия</button>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>
