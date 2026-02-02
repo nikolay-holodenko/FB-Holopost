@@ -1,38 +1,47 @@
 {
-  "manifest_version": 2,
-  "name": "FB Holopost",
-  "version": "1.0.0",
-  "author": "Nikolay Holodenko",
-  "description": "AI-powered content risk analyzer for Facebook. Protect your voice.",
-  "icons": {
-    "128": "icon.png"
-  },
+  "manifest_version": 3,
+  "name": "__MSG_extensionName__",
+  "version": "1.1.0",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "bg",
   "permissions": [
     "contextMenus",
-    "storage",
     "activeTab",
-    "https://generativelanguage.googleapis.com/*",
-    "https://raw.githubusercontent.com/nikolay-holodenko/FB-Holopost/main/*"
+    "scripting",
+    "storage"
   ],
   "background": {
     "scripts": ["background.js"]
   },
-  "browser_action": {
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
     "default_popup": "popup.html",
-    "default_icon": "icon.png"
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
   },
-  "options_ui": {
-    "page": "options.html",
-    "open_in_tab": true
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "holopost@nikolay-holodenko",
-"data_collection_permissions": {
-  "required": ["none"],
-  "opt_out": [],
-  "description": "No data collection performed."
-}
+      "id": "holopost@ai-addon.org",
+      "strict_min_version": "109.0"
     }
   }
 }

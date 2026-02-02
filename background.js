@@ -1,70 +1,103 @@
-// Създаване на контекстно меню
-browser.contextMenus.create({
-  id: "check-risk",
-  title: "FB Holopost: Analyze Content",
-  contexts: ["selection", "image"]
-});
+let lastPendingRequest = null;
+const MODELS = ["gemini-2.5-flash", "gemini-1.5-flash"];
 
-// Основна функция за анализ с "Чифте пищови"
-async function callAI(content, keys, index = 0) {
-  if (index >= keys.length) throw new Error("API_LIMIT_REACHED");
-  
-  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keys[index]}`;
-  
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: content }] }] })
-    });
-    
-    if (response.status === 429) return callAI(content, keys, index + 1);
-    return await response.json();
-  } catch (e) {
-    return callAI(content, keys, index + 1);
-  }
+const prompts = {
+  bg: "Анализирай следния текст за риск от цензура във Facebook. ЗАДЪЛЖИТЕЛНО започни отговора си с 'Риск: XX%'. Отговори на български език: ",
+  en: "Analyze the following text for Facebook censorship risk. MUST start your response with 'Risk: XX%'. Answer in English: "
+};
+
+function updateMenuTitle() {
+  chrome.storage.local.get(['lang'], (data) => {
+    const lang = data.lang || 'bg';
+    const title = (lang === 'en') ? "FB Holopost: Analyze" : "FB Holopost: Анализирай";
+    chrome.contextMenus.update("analyze-content", { title: title });
+  });
 }
 
-// Слушател за клик върху менюто
-browser.contextMenus.onClicked.addListener(async (info) => {
-  const data = await browser.storage.local.get(["key1", "key2", "key3", "lang"]);
-  const keys = [data.key1, data.key2, data.key3].filter(k => k);
-  const lang = data.lang || (navigator.language.includes('bg') ? 'bg' : 'en');
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({ id: "analyze-content", title: "FB Holopost: Анализирай", contexts: ["selection"] });
+  updateMenuTitle();
+});
 
-  if (keys.length === 0) {
-    alert(lang === 'bg' ? "Моля, въведете API ключ в настройките!" : "Please enter an API key in settings!");
+chrome.storage.onChanged.addListener((changes) => { if (changes.lang) updateMenuTitle(); });
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "analyze-content") {
+    chrome.storage.local.get(['key1', 'key2', 'key3', 'lang'], function(data) {
+      const keys = [data.key1, data.key2, data.key3].filter(k => k && k.trim() !== "");
+      const lang = data.lang || 'bg';
+
+      if (keys.length > 0) {
+        chrome.tabs.sendMessage(tab.id, { action: "show_loading", lang: lang });
+        callAI(prompts[lang] + info.selectionText, keys, tab.id, 0, 0, lang);
+      } else {
+        chrome.tabs.sendMessage(tab.id, { 
+            action: "show_result", 
+            text: (lang === 'en' ? "⚠️ No API keys found!" : "⚠️ Не са намерени API ключове!"), 
+            color: "red", lang: lang 
+        });
+      }
+    });
+  }
+});
+
+async function callAI(prompt, keys, tabId, keyIndex, modelIndex, lang) {
+  // АКО СМЕ ИЗЧЕРПАЛИ ВСИЧКИ КЛЮЧОВЕ
+  if (keyIndex >= keys.length) {
+    chrome.tabs.sendMessage(tabId, { 
+        action: "show_result", 
+        text: (lang === 'en' ? "❌ No active keys available!" : "❌ Няма активни ключове в момента!"), 
+        color: "red", lang: lang 
+    });
     return;
   }
 
-  const prompt = `Analyze this for Facebook censorship risk (0-100%). Answer in ${lang}. Content: ${info.selectionText || info.srcUrl}`;
-
-  try {
-    const result = await callAI(prompt, keys);
-    const text = result.candidates[0].content.parts[0].text;
-    await browser.storage.local.set({ lastResult: text });
-    alert("FB Holopost: Analysis Complete / Анализът е завършен! Check the popup.");
-  } catch (e) {
-    alert("Error: All API keys failed or limit reached.");
+  const storageKey = `lock_key${keyIndex + 1}`;
+  const lockData = await chrome.storage.local.get([storageKey]);
+  
+  // Проверка дали текущият ключ е блокиран
+  if (lockData[storageKey] && lockData[storageKey] > Date.now()) {
+    console.log(`Ключ ${keyIndex + 1} е блокиран. Пробвам следващия...`);
+    return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
   }
-});
 
-// ПРОВЕРКА ЗА НОВА ВЕРСИЯ (Survivor Module)
-async function checkForUpdates() {
-  const GITHUB_VER_URL = "https://raw.githubusercontent.com/nikolay-holodenko/FB-Holopost/main/version.json";
+  // Маркираме активния ключ
+  chrome.storage.local.set({ active_key_index: keyIndex + 1 });
+
+  const currentModel = MODELS[modelIndex] || MODELS[0];
+  const url = `https://generativelanguage.googleapis.com/v1/models/${currentModel}:generateContent?key=${keys[keyIndex]}`;
+
   try {
-    const response = await fetch(GITHUB_VER_URL);
-    const data = await response.json();
-    if (data.version !== "1.0.0") {
-      await browser.storage.local.set({ 
-        updateAvailable: true, 
-        newVersion: data.version,
-        updateUrl: data.update_link 
-      });
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+
+    const resData = await response.json();
+
+    if (response.status === 429) {
+      let seconds = 60;
+      const waitMatch = (resData.error?.message || "").match(/retry in ([\d\.]+)s/);
+      if (waitMatch) seconds = parseFloat(waitMatch[1]);
+
+      await chrome.storage.local.set({ [storageKey]: Date.now() + (seconds * 1000) });
+
+      // Продължаваме към следващия ключ
+      return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
+    }
+
+    if (response.ok && resData.candidates) {
+      const resultText = resData.candidates[0].content.parts[0].text;
+      const match = resultText.match(/(?:Риск|Risk):\s*(\d+)%/i);
+      const p = match ? parseInt(match[1]) : 0;
+      let color = p >= 85 ? "#d93025" : (p >= 45 ? "#f9ab00" : "#28a745");
+      chrome.tabs.sendMessage(tabId, { action: "show_result", text: resultText, color: color, lang: lang });
+    } else {
+      // При друга грешка също пробваме следващия ключ
+      return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
     }
   } catch (e) {
-    console.log("Update check skipped.");
+    return callAI(prompt, keys, tabId, keyIndex + 1, 0, lang);
   }
 }
-
-// Проверявай при всяко стартиране
-checkForUpdates();

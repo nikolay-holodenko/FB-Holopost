@@ -1,49 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <style>
-        body { width: 400px; padding: 20px; font-family: sans-serif; line-height: 1.6; }
-        .card { background: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
-        h2 { color: #1a73e8; margin-top: 0; }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; }
-        input[type="text"], select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%; }
-        button:hover { background: #1557b0; }
-        .status { margin-top: 10px; color: green; font-weight: bold; text-align: center; }
-    </style>
+  <meta charset="UTF-8">
+  <title>FB Holopost Настройки</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; padding: 20px; background: #f0f2f5; color: #1c1e21; }
+    .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 450px; margin: auto; }
+    h2 { margin-top: 0; color: #1877f2; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+    label { display: block; margin-top: 15px; font-weight: 600; font-size: 14px; }
+    input { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
+    select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; }
+    .hint { font-size: 11px; color: #65676b; margin-top: 4px; }
+    button { 
+      margin-top: 25px; width: 100%; padding: 12px; background: #42b72a; color: white; 
+      border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px;
+    }
+    button:hover { background: #36a420; }
+    #status { margin-top: 15px; text-align: center; font-weight: bold; min-height: 20px; }
+  </style>
 </head>
 <body>
-    <div class="card">
-        <h2>FB Holopost Settings</h2>
-        
-        <div class="input-group">
-            <label>Language / Език:</label>
-            <select id="lang">
-                <option value="bg">Български</option>
-                <option value="en">English</option>
-            </select>
-        </div>
+  <div class="card">
+    <h2>Настройки</h2>
+    <label>Gemini API Key 1:</label>
+    <input type="text" id="key1" placeholder="AIZA...">
+    <label>Gemini API Key 2:</label>
+    <input type="text" id="key2" placeholder="AIZA...">
+    <label>Gemini API Key 3:</label>
+    <input type="text" id="key3" placeholder="AIZA...">
+    <div class="hint">* Използваме няколко ключа за заобикаляне на лимитите (Error 429).</div>
+    
+    <label>Език на анализа:</label>
+    <select id="lang">
+      <option value="bg">Български</option>
+      <option value="en">English</option>
+    </select>
 
-        <div class="input-group">
-            <label>API Key 1 (Primary):</label>
-            <input type="text" id="key1" placeholder="Paste Gemini Key here...">
-        </div>
-
-        <div class="input-group">
-            <label>API Key 2 (Backup):</label>
-            <input type="text" id="key2" placeholder="Second key...">
-        </div>
-
-        <div class="input-group">
-            <label>API Key 3 (Backup):</label>
-            <input type="text" id="key3" placeholder="Third key...">
-        </div>
-
-        <button id="save">Save / Запази</button>
-        <div id="status" class="status"></div>
-    </div>
-    <script src="options.js"></script>
+    <button id="save">Запази промените</button>
+    <div id="status"></div>
+  </div>
+  <script src="options.js"></script>
 </body>
 </html>

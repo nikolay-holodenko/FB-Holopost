@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "FB Holopost"
+  },
+  "extensionDescription": {
+    "message": "Analyze text for censorship risk using Gemini AI."
+  },
+  "contextMenuTitle": {
+    "message": "FB Holopost: Analyze"
+  }
+}
