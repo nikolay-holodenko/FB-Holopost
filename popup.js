@@ -1,4 +1,4 @@
-const CURRENT_VERSION = "1.1";
+const CURRENT_VERSION = "1.2.1";
 const GITHUB_VER_URL = "https://raw.githubusercontent.com/nikolay-holodenko/FB-Holopost/main/version.json";
 
 const uiTranslations = {
@@ -9,58 +9,56 @@ const uiTranslations = {
 function applyTranslations(lang) {
   const t = uiTranslations[lang] || uiTranslations.bg;
   document.getElementById('ui-title').textContent = t.title;
-  document.getElementById('ui-key1').childNodes[0].textContent = t.key1;
-  document.getElementById('ui-key2').childNodes[0].textContent = t.key2;
-  document.getElementById('ui-key3').childNodes[0].textContent = t.key3;
-  document.getElementById('ui-lang-label').textContent = t.langLabel;
+  
+  const k1 = document.getElementById('ui-key1'); k1.childNodes[0].textContent = t.key1 + " ";
+  const k2 = document.getElementById('ui-key2'); k2.childNodes[0].textContent = t.key2 + " ";
+  const k3 = document.getElementById('ui-key3'); k3.childNodes[0].textContent = t.key3 + " ";
+  
+  document.getElementById('ui-lang').textContent = t.langLabel;
   document.getElementById('save').textContent = t.saveBtn;
   document.getElementById('update-btn').textContent = t.update;
 }
 
+// Помощна функция за сравняване на версии (напр. 1.2.1 vs 1.1)
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const n1 = parts1[i] || 0;
+    const n2 = parts2[i] || 0;
+    if (n1 > n2) return 1;  // v1 е по-голяма
+    if (n1 < n2) return -1; // v2 е по-голяма (има ъпдейт)
+  }
+  return 0; // Равни са
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  const statusEl = document.getElementById('status-text');
   document.getElementById('current-version').textContent = CURRENT_VERSION;
 
-  // 1. ПРОВЕРКА ЗА НОВА ВЕРСИЯ (НЕКРИТИЧНА)
-  fetch(GITHUB_VER_URL)
-    .then(res => res.json())
-    .then(data => {
-      if (data.version !== CURRENT_VERSION) {
-        const upBtn = document.getElementById('update-btn');
-        upBtn.style.display = "block";
-        upBtn.onclick = () => window.open(data.update_url, '_blank');
-      }
-    })
-    .catch(e => console.log("Update check skipped"));
-
-  // 2. ЗАРЕЖДАНЕ НА ДАННИ
-  chrome.storage.local.get(['key1', 'key2', 'key3', 'lang'], (data) => {
-    const lang = data.lang || 'bg';
-    applyTranslations(lang);
-    if (data.key1) document.getElementById('key1').value = data.key1;
-    if (data.key2) document.getElementById('key2').value = data.key2;
-    if (data.key3) document.getElementById('key3').value = data.key3;
-    document.getElementById('lang').value = lang;
-    updateStatus(data.key1, statusEl, lang);
+  chrome.storage.local.get(['key1', 'key2', 'key3', 'lang'], (res) => {
+    if (res.key1) document.getElementById('key1').value = res.key1;
+    if (res.key2) document.getElementById('key2').value = res.key2;
+    if (res.key3) document.getElementById('key3').value = res.key3;
+    if (res.lang) {
+      document.getElementById('lang').value = res.lang;
+      applyTranslations(res.lang);
+    } else {
+      applyTranslations('bg');
+    }
   });
 
-  // 3. ЗАПАЗВАНЕ
-  document.getElementById('save').addEventListener('click', () => {
-    const lang = document.getElementById('lang').value;
-    const settings = {
-      key1: document.getElementById('key1').value.trim(),
-      key2: document.getElementById('key2').value.trim(),
-      key3: document.getElementById('key3').value.trim(),
-      lang: lang
-    };
-    chrome.storage.local.set(settings, () => {
-      const btn = document.getElementById('save');
-      btn.textContent = uiTranslations[lang].done;
-      setTimeout(() => { btn.textContent = uiTranslations[lang].saveBtn; }, 2000);
-      updateStatus(settings.key1, statusEl, lang);
-      applyTranslations(lang);
-    });
-  });
+  // УМНА ПРОВЕРКА ЗА ЪПДЕЙТ
+  fetch(GITHUB_VER_URL).then(r => r.json()).then(data => {
+    const hasNewVersion = compareVersions(CURRENT_VERSION, data.version) === -1; // Ако текущата е по-малка
+    const isCritical = data.critical === true;
+
+    if (hasNewVersion || isCritical) {
+      const btn = document.getElementById('update-btn');
+      btn.style.display = "block";
+      btn.onclick = () => window.open(data.update_url || "https://github.com/nikolay-holodenko/FB-Holopost", "_blank");
+    }
+  }).catch(e => console.log("Update check failed", e));
 
   setInterval(checkKeyStatus, 1000);
 });
@@ -77,7 +75,6 @@ async function checkKeyStatus() {
     const timerSpan = document.getElementById(`timer-key${i}`);
     const activeSpan = document.getElementById(`active-${i}`);
     const lockTime = data[`lock_key${i}`];
-
     const isLocked = lockTime && lockTime > now;
 
     if (activeSpan) {
@@ -97,13 +94,24 @@ async function checkKeyStatus() {
   }
 }
 
-function updateStatus(key, element, lang) {
-  const t = uiTranslations[lang];
-  if (key && key.length > 10) {
-    element.textContent = t.statusActive;
-    element.className = "active";
-  } else {
-    element.textContent = t.statusInactive;
-    element.className = "inactive";
-  }
-}
+document.getElementById('save').addEventListener('click', () => {
+  const settings = {
+    key1: document.getElementById('key1').value.trim(),
+    key2: document.getElementById('key2').value.trim(),
+    key3: document.getElementById('key3').value.trim(),
+    lang: document.getElementById('lang').value
+  };
+
+  chrome.storage.local.set(settings, () => {
+    const status = document.getElementById('status');
+    const lang = settings.lang || 'bg';
+    status.textContent = uiTranslations[lang].done;
+    status.style.color = "#42b72a";
+    applyTranslations(lang);
+    setTimeout(() => { status.textContent = ""; }, 3000);
+  });
+});
+
+document.getElementById('lang').addEventListener('change', (e) => {
+  applyTranslations(e.target.value);
+});

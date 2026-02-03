@@ -1,20 +1,27 @@
-/* content.css */
+/* content.css - v1.2.1 Free Resize */
 .holopost-box {
   background: white;
   color: #1c1e21;
-  width: 350px;        /* Фиксирана начална ширина */
-  max-height: 400px;   /* КРИТИЧНО: Никога не стартира по-голямо от това! */
+  
+  /* Първоначални размери, но без таван */
+  min-width: 300px;
+  min-height: 100px;
+  width: auto;         /* Позволява разтягане */
+  height: auto;
+  max-width: 90vw;     /* Да не излиза от екрана хоризонтално */
+  max-height: 90vh;    /* Да не излиза от екрана вертикално */
+  
   border-radius: 8px;
   box-shadow: 0 12px 28px rgba(0,0,0,0.3);
   font-family: Segoe UI, Helvetica, Arial, sans-serif;
   
-  /* Позволява на потребителя да променя размера ръчно */
+  /* Свободно преоразмеряване */
   resize: both;
   overflow: hidden; 
   
-  /* Flexbox за правилно позициониране на скролера */
   display: flex;
   flex-direction: column;
+  z-index: 2147483647;
 }
 
 .header {
@@ -24,7 +31,7 @@
   display: flex;
   justify-content: space-between;
   border-bottom: 1px solid #ddd;
-  cursor: move; /* Индикация, че може да се мести */
+  cursor: move;
   flex-shrink: 0;
   user-select: none;
 }
@@ -36,12 +43,12 @@
 }
 .close:hover { color: #d93025; }
 
-/* Тук е скролерът */
+/* Скролерът заема всичкото останало място */
 .content { 
   padding: 15px; 
   white-space: pre-wrap; 
   font-size: 14px;
-  overflow-y: auto; /* Скролира само текста, хедъра остава видим */
+  overflow-y: auto;
   flex-grow: 1;
   height: 100%;
 }
@@ -49,34 +56,5 @@
 /* Скролер стилизация за Firefox */
 .content {
   scrollbar-width: thin;
-  scrollbar-color: #ccc #f0f0f0;
-}
-
-.timer-container, .action-container {
-  margin-top: 10px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.timer-container { color: #d93025; font-weight: bold; }
-
-.get-key-btn {
-  display: inline-block;
-  background: #1877f2;
-  color: white;
-  text-decoration: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: bold;
-}
-.get-key-btn:hover { background: #166fe5; }
-
-#retry-btn {
-  background: #1877f2;
-  color: white;
-  border: none;
-  padding: 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  width: 100%;
+  scrollbar-color: #bcc0c4 #f0f2f5;
 }
