@@ -1,4 +1,4 @@
-const CURRENT_VERSION = "1.2.1";
+const CURRENT_VERSION = "1.2";
 const GITHUB_VER_URL = "https://raw.githubusercontent.com/nikolay-holodenko/FB-Holopost/main/version.json";
 
 const uiTranslations = {
