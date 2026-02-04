@@ -1,9 +1,10 @@
 {
-  "version": "1.0",
+  "version": "1.3",
   "critical": false,
   "update_url": "https://github.com/nikolay-holodenko/FB-Holopost",
   "message": "Нова версия с подобрен анализ!"
 }
+
 
 
 
