@@ -3,7 +3,7 @@
     "holopost@ai-addon.org": {
       "updates": [
         {
-          "version": "1.1",
+          "version": "1.2",
           "update_link": "https://github.com/nikolay-holodenko/FB-Holopost"
         }
       ]
@@ -11,3 +11,4 @@
   }
 
 }
+
