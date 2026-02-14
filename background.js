@@ -1,7 +1,7 @@
 let isAnalyzing = false;
 let debugEnabled = false;
 
-// Твоите оригинални модели от v1.1
+// Твоите оригинални модели
 const MODELS = ["gemini-2.5-flash", "gemini-1.5-flash"];
 
 const prompts = {
@@ -14,7 +14,6 @@ function setupMenu() {
     chrome.storage.local.get(['lang'], (data) => {
       const lang = data.lang || 'bg';
       const title = (lang === 'en') ? "FB Holopost: Analyze" : "FB Holopost: Анализирай";
-      // Променяме contexts на "all", за да хваща и снимки в бъдеще, но логиката долу решава какво да прави
       chrome.contextMenus.create({ id: "analyze-content", title: title, contexts: ["all"] });
     });
   });
@@ -35,25 +34,14 @@ async function startAnalysis(info, tab) {
   const data = await chrome.storage.local.get(['key1', 'key2', 'key3', 'lang']);
   const lang = data.lang || 'bg';
 
-  // Запазваме връзката между стойност и номер на ключа (ID)
   const rawKeys = [
     { val: data.key1?.trim(), id: 1 },
     { val: data.key2?.trim(), id: 2 },
     { val: data.key3?.trim(), id: 3 }
   ];
 
-  // Проверка за дебъг режим
   debugEnabled = rawKeys.some(k => k.val === "debuglogtrue");
-  
-  // Филтриране: Махаме празните и debug фразата. Остават само истинските.
   const validKeys = rawKeys.filter(k => k.val && k.val.length > 20 && k.val !== "debuglogtrue");
-
-  if (debugEnabled) {
-    chrome.tabs.sendMessage(tab.id, { 
-      action: "debug_msg", 
-      log: `Start Analysis. Found ${validKeys.length} valid keys.` 
-    });
-  }
 
   if (validKeys.length === 0) {
     const msg = (lang === 'en' ? "⚠️ Missing API Key!" : "⚠️ Липсва API ключ!");
@@ -62,18 +50,14 @@ async function startAnalysis(info, tab) {
     return;
   }
 
-  // Питаме content.js какво има под мишката
-  chrome.tabs.sendMessage(tab.id, { action: "get_content" }, (response) => {
-    if (!response || response.type === "none") {
-      const msg = (lang === 'en' ? "❌ No content found." : "❌ Не е открито съдържание.");
-      chrome.tabs.sendMessage(tab.id, { action: "show_result", text: msg, color: "orange", lang: lang });
-      isAnalyzing = false;
-      return;
-    }
-
-    chrome.tabs.sendMessage(tab.id, { action: "show_loading", lang: lang });
-    processCall(response, validKeys, tab.id, 0, lang);
-  });
+chrome.tabs.sendMessage(tab.id, { action: "get_content" }, (response) => {
+if (chrome.runtime.lastError || !response || response.type === "none") {
+isAnalyzing = false;
+return;
+}
+chrome.tabs.sendMessage(tab.id, { action: "show_loading", lang: lang });
+processCall(response, validKeys, tab.id, 0, lang);
+});
 }
 
 async function processCall(content, keys, tabId, kIdx, lang) {
@@ -85,30 +69,27 @@ async function processCall(content, keys, tabId, kIdx, lang) {
   }
 
   const currentKeyObj = keys[kIdx];
-  const lockKey = `lock_key${currentKeyObj.id}`; // Ползваме оригиналното ID (1, 2 или 3)
+  const lockKey = `lock_key${currentKeyObj.id}`;
   const lockData = await chrome.storage.local.get([lockKey]);
 
   if (lockData[lockKey] && lockData[lockKey] > Date.now()) {
-    if (debugEnabled) chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Key ${currentKeyObj.id} is locked. Skipping.` });
     return processCall(content, keys, tabId, kIdx + 1, lang);
   }
 
-  // Маркираме активния ключ (за popup.js)
+  // Запазваме отбелязването на активния ключ (зеления маркер)
   chrome.storage.local.set({ active_key_index: currentKeyObj.id });
 
-  // URL - Връщаме се към v1, защото v1beta правеше проблеми с някои модели
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS[0]}:generateContent?key=${currentKeyObj.val}`;
   
-  let payload;
+  if (debugEnabled) {
+    chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Using Key ID: ${currentKeyObj.id}` });
+    chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `URL: ${url}` });
+  }
 
-  // СТРУКТУРАТА ЗА ТЕКСТ - АБСОЛЮТНО СЪЩАТА КАТО В v1.1
+  let payload;
   if (content.type === "text") {
-    payload = { 
-      contents: [{ parts: [{ text: prompts[lang] + content.data }] }] 
-    };
-  } 
-  // ПОДГОТОВКА ЗА СНИМКИ (Нова логика, изолирана)
-  else if (content.type === "image") {
+    payload = { contents: [{ parts: [{ text: prompts[lang] + content.data }] }] };
+  } else if (content.type === "image") {
     payload = {
       contents: [{
         parts: [
@@ -120,8 +101,6 @@ async function processCall(content, keys, tabId, kIdx, lang) {
   }
 
   try {
-    if (debugEnabled) chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Sending request with Key ${currentKeyObj.id} to ${MODELS[0]}...` });
-
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -131,8 +110,7 @@ async function processCall(content, keys, tabId, kIdx, lang) {
     const resData = await response.json();
 
     if (debugEnabled) {
-      chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Response Status: ${response.status}` });
-      if (!response.ok) chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Error Body: ${JSON.stringify(resData)}` });
+      chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Status: ${response.status}` });
     }
 
     if (response.status === 429) {
@@ -150,12 +128,11 @@ async function processCall(content, keys, tabId, kIdx, lang) {
       let color = p >= 85 ? "#d93025" : (p >= 45 ? "#f9ab00" : "#28a745");
       chrome.tabs.sendMessage(tabId, { action: "show_result", text: resultText, color: color, lang: lang });
     } else {
-      // При техническа грешка (400) не въртим ключовете, а спираме и показваме грешката
       let errText = resData.error?.message || "API Error";
       chrome.tabs.sendMessage(tabId, { action: "show_result", text: "❌ " + errText, color: "red", lang: lang });
     }
   } catch (e) {
-    if (debugEnabled) chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Network Exception: ${e.message}` });
+    if (debugEnabled) chrome.tabs.sendMessage(tabId, { action: "debug_msg", log: `Fetch Error: ${e.message}` });
     return processCall(content, keys, tabId, kIdx + 1, lang);
   } finally {
     isAnalyzing = false;

@@ -1,13 +1,11 @@
-// content.js - v1.2.1 Stable Base
 let mouseX = 0, mouseY = 0, hostElement = null, timerInterval = null;
-let lastRightClickedElement = null; // Запомняме елемента под мишката
+let lastRightClickedElement = null;
 
 const translations = {
   bg: { loading: "⏳ Анализиране...", wait: "Изчакайте", sec: "сек.", retry: "🔄 Опитай пак", getKey: "🔑 Вземи безплатен ключ", quota: "🚫 Квотата е пълна.", updateTitle: "🚨 КРИТИЧЕН ЪПДЕЙТ!", updateMsg: "Вашата версия е остаряла. Моля, изтеглете новата.", updateBtn: "⬇️ ИЗТЕГЛИ" },
   en: { loading: "⏳ Analyzing...", wait: "Please wait", sec: "sec.", retry: "🔄 Try Again", getKey: "🔑 Get free API key", quota: "🚫 Quota exceeded.", updateTitle: "🚨 CRITICAL UPDATE!", updateMsg: "Your version is outdated. Please update.", updateBtn: "⬇️ DOWNLOAD" }
 };
 
-// Слушаме къде е цъкнато с десен бутон (за снимките)
 document.addEventListener("contextmenu", (e) => {
   lastRightClickedElement = e.target;
   mouseX = e.clientX; 
@@ -18,33 +16,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const lang = request.lang || 'bg';
   const t = translations[lang];
 
-  // LOGIC: Обработка на Debug съобщения
   if (request.action === "debug_msg") {
     console.log("%c[FB Holopost Debug]", "color: #00ff00; background: #000; padding: 4px;", request.log);
     return;
   }
 
-  // LOGIC: Откриване на съдържание (Текст или Снимка)
   if (request.action === "get_content") {
-    // 1. Първо проверяваме за селектиран текст (както във v1.1)
     const selectedText = window.getSelection().toString().trim();
-    if (selectedText) {
+    // Филтър: ако текстът е под 3 символа, преминаваме към проверка за снимка
+    if (selectedText.length >= 3) {
       sendResponse({ type: "text", data: selectedText });
       return true;
     }
 
-    // 2. Ако няма текст, търсим снимка (Подготовка за 1.2.1)
     findImage(lastRightClickedElement).then(imgData => {
-      if (imgData) {
+      if (imgData && imgData.base64) {
         sendResponse({ type: "image", data: imgData.base64, mime: imgData.mime });
       } else {
+        // Ако няма нито текст, нито адекватна снимка, не пращаме заявка
         sendResponse({ type: "none" });
       }
     });
-    return true; // Важно за асинхронен отговор
+    return true;
   }
 
-  // UI Логика (Оригинална от v1.1)
   if (request.action === "show_loading") createUI(t.loading, "#666", false, 0, false, lang);
   else if (request.action === "show_result") {
     let txt = (request.text === "QUOTA_EXCEEDED") ? t.quota : request.text;
@@ -53,11 +48,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   else if (request.action === "show_update_block") createUI(t.updateMsg, "#d93025", false, 0, false, lang, true, request.updateUrl);
 });
 
-// Нова функция: Търсене на снимка и конвертиране (Safe Mode)
 async function findImage(el) {
   if (!el) return null;
 
-  // Helper за извличане на URL
   const getSrc = (node) => {
     if (node.tagName === "IMG") return node.src;
     const style = window.getComputedStyle(node);
@@ -67,27 +60,27 @@ async function findImage(el) {
     return null;
   };
 
-  // Търсим в елемента или нагоре в родителите (до 5 нива)
   let src = getSrc(el);
   if (!src) {
     let p = el.parentElement;
     for (let i = 0; i < 5 && p; i++) {
-      src = getSrc(p) || p.querySelector('img')?.src; // Проверяваме и за вложени img
+      src = getSrc(p) || p.querySelector('img')?.src;
       if (src) break;
       p = p.parentElement;
     }
   }
 
-  if (src) {
+  if (src && !src.startsWith('data:image/svg+xml')) {
     try {
-      // Изтегляне и компресия (Canvas)
       const res = await fetch(src);
       const blob = await res.blob();
       const bmp = await createImageBitmap(blob);
       
+      // Филтър: игнорираме системни икони и UI елементи под 100x100
+      if (bmp.width < 100 || bmp.height < 100) return null;
+
       const canvas = document.createElement('canvas');
       let w = bmp.width, h = bmp.height;
-      // Лек resize за пестене на квота
       if (w > 1024 || h > 1024) {
         const r = Math.min(1024 / w, 1024 / h);
         w *= r; h *= r;
@@ -98,51 +91,46 @@ async function findImage(el) {
       
       return { base64: canvas.toDataURL('image/jpeg', 0.8).split(',')[1], mime: 'image/jpeg' };
     } catch (e) {
-      console.error("Image processing error:", e);
       return null;
     }
   }
   return null;
 }
 
-// UI Функция (100% копие от твоя v1.1 файл, за да не чупим дизайна)
 function createUI(text, color, isTimer, seconds, missingKey, lang, isUpdate = false, updateUrl = "") {
   const t = translations[lang];
   if (hostElement) { hostElement.remove(); clearInterval(timerInterval); }
   hostElement = document.createElement("div");
-  hostElement.id = "holopost-host";
-  // Позициониране до мишката
   hostElement.style.cssText = `position: fixed; top: ${mouseY + 10}px; left: ${mouseX + 10}px; z-index: 2147483647;`;
   document.body.appendChild(hostElement);
 
   const shadowRoot = hostElement.attachShadow({ mode: "open" });
-  
-  // Вмъкваме CSS (предполагаме, че content.css е наличен както в v1.1)
   const styleLink = document.createElement("link");
   styleLink.rel = "stylesheet";
   styleLink.href = chrome.runtime.getURL("content.css");
   shadowRoot.appendChild(styleLink);
 
   const wrapper = document.createElement("div");
-  wrapper.className = "holopost-box";
+wrapper.className = "holopost-box";
+if (text !== t.loading && !isUpdate) {
+  wrapper.classList.add("is-result");
+}
   wrapper.style.borderLeft = `5px solid ${color}`;
   
   const headerText = isUpdate ? t.updateTitle : 'FB Holopost';
-  
   const header = document.createElement("div");
   header.className = "header";
   header.innerHTML = `<span>${headerText}</span><span class="close">✖</span>`;
 
   const content = document.createElement("div");
   content.className = "content";
-  content.innerHTML = text; // Позволяваме HTML за линкове/бутони
+  content.innerHTML = text;
 
   if (isUpdate) {
     const upDiv = document.createElement("div");
     upDiv.style.marginTop = "10px";
     upDiv.innerHTML = `<button id="hp-up-btn" style="background:#d93025;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;width:100%;font-weight:bold;">${t.updateBtn}</button>`;
     content.appendChild(upDiv);
-    // Трябва да изчакаме елемента да влезе в DOM
     setTimeout(() => {
         const btn = shadowRoot.getElementById("hp-up-btn");
         if(btn) btn.onclick = () => window.open(updateUrl, '_blank');
